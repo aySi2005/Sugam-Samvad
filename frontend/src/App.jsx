@@ -66,6 +66,8 @@ function App() {
   const speechActiveRef = useRef(false);
   const silenceTimerRef = useRef(null);
   const listeningLanguageRef = useRef("en");
+  const speechQueueRef = useRef([]);
+  const speechPlayingRef = useRef(false);
 
   const speechLanguageCodes = {
     en: "en-US",
@@ -75,39 +77,74 @@ function App() {
     es: "es-ES",
   };
 
-  const speakTranslation = (text, languageCode) => {
-    if (!text || !window.speechSynthesis) {
-      return;
-    }
+const speakTranslation = (text, languageCode) => {
+  if (!text || !window.speechSynthesis) {
+    return;
+  }
 
-    const targetLanguage =
-      speechLanguageCodes[languageCode];
+  // Add the new translation to the queue
+  speechQueueRef.current.push({
+    text,
+    languageCode,
+  });
 
-    const voices =
-      window.speechSynthesis.getVoices();
+  // If something is already speaking,
+  // wait until it finishes.
+  if (speechPlayingRef.current) {
+    return;
+  }
 
-    const voice =
-      voices.find(
-        v => v.lang === targetLanguage
-      ) ||
-      voices.find(
-        v =>
-          v.lang &&
-          v.lang.startsWith(
-            languageCode
-          )
-      );
+  playNextSpeech();
+};
 
-    if (!voice) {
-      console.warn(
-        `⚠️ No TTS voice available for ${languageCode}`
-      );
-      return;
-    }
 
-    window.speechSynthesis.cancel();
+const playNextSpeech = () => {
+  if (!window.speechSynthesis) {
+    return;
+  }
 
-    const utterance =
+  // Nothing left in the queue
+  if (speechQueueRef.current.length === 0) {
+    speechPlayingRef.current = false;
+    setSpeaking(false);
+    return;
+  }
+
+  const nextSpeech =
+    speechQueueRef.current.shift();
+
+  const {
+    text,
+    languageCode,
+  } = nextSpeech;
+
+  const targetLanguage =
+    speechLanguageCodes[languageCode];
+
+  const voices =
+    window.speechSynthesis.getVoices();
+
+  const voice =
+    voices.find(
+      v => v.lang === targetLanguage
+    ) ||
+    voices.find(
+      v =>
+        v.lang &&
+        v.lang.startsWith(languageCode)
+    );
+
+  if (!voice) {
+    console.warn(
+      `⚠️ No TTS voice available for ${languageCode}`
+    );
+
+    // Continue with the next item
+    playNextSpeech();
+    return;
+  }
+
+  const utterance =
       new SpeechSynthesisUtterance(text);
 
     utterance.voice = voice;
@@ -115,6 +152,9 @@ function App() {
     utterance.rate = 0.95;
     utterance.pitch = 1;
     utterance.volume = 1;
+
+    speechPlayingRef.current = true;
+    setSpeaking(true);
 
     console.log(
       "🔊 Speaking:",
@@ -128,11 +168,20 @@ function App() {
     };
 
     utterance.onend = () => {
-      setSpeaking(false);
+      console.log("✅ Speech finished");
+
+      // Small gap between sentences
+      setTimeout(() => {
+        playNextSpeech();
+      }, 150);
     };
 
     utterance.onerror = () => {
-      setSpeaking(false);
+      console.warn("⚠️ Speech error");
+
+      setTimeout(() => {
+        playNextSpeech();
+      }, 150);
     };
 
     window.speechSynthesis.speak(
@@ -141,7 +190,10 @@ function App() {
   };
 
 
-  const stopSpeaking = () => {
+const stopSpeaking = () => {
+    speechQueueRef.current = [];
+    speechPlayingRef.current = false;
+
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
