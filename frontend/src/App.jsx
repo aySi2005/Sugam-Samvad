@@ -330,7 +330,7 @@ function App() {
 
   useEffect(() => {
     const socket = new WebSocket(
-      "ws://127.0.0.1:8000/ws?token=diplomai-test-123"
+      "wss://sugam-samvad.onrender.com/ws?token=diplomai-test-123"
     );
 
     socket.binaryType = "arraybuffer";
