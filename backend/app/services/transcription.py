@@ -1,192 +1,194 @@
 import os
 import time
 
-from faster_whisper import WhisperModel
+from groq import Groq
 
 
-MODEL_NAME = os.getenv(
-    "DIPLOMAI_WHISPER_MODEL",
-    "Systran/faster-whisper-medium",
-)
+# ---------------------------------------------------------
+# Groq configuration
+# ---------------------------------------------------------
 
-DEVICE_SETTING = os.getenv(
-    "DIPLOMAI_DEVICE",
-    "auto",
-)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+MODEL_NAME = "whisper-large-v3"
 
-def detect_device():
-    if DEVICE_SETTING == "cpu":
-        print("💻 Forced CPU mode")
-        return "cpu", "int8"
-
-    if DEVICE_SETTING == "cuda":
-        print("🚀 Forced CUDA mode")
-        return "cuda", "float16"
-
-    try:
-        import ctranslate2
-
-        if ctranslate2.get_cuda_device_count() > 0:
-            print("🚀 NVIDIA GPU detected")
-            return "cuda", "float16"
-
-    except Exception:
-        pass
-
-    print("💻 Using CPU")
-    return "cpu", "int8"
+if not GROQ_API_KEY:
+    print("WARNING: GROQ_API_KEY is not set")
+    client = None
+else:
+    client = Groq(api_key=GROQ_API_KEY)
 
 
-DEVICE, COMPUTE_TYPE = detect_device()
-
-
-print("=" * 60)
-print("Loading DiplomAI Whisper model...")
-print("Model:", MODEL_NAME)
-print("Device:", DEVICE)
-print("Compute type:", COMPUTE_TYPE)
-print("=" * 60)
-
-
-model_start = time.time()
-
-model = WhisperModel(
-    MODEL_NAME,
-    device=DEVICE,
-    compute_type=COMPUTE_TYPE,
-    cpu_threads=4,
-    num_workers=1,
-)
-
-print(
-    "✅ Whisper model loaded in "
-    f"{time.time() - model_start:.2f}s"
-)
-
+# ---------------------------------------------------------
+# Transcription
+# ---------------------------------------------------------
 
 def transcribe_audio(
     audio_path: str,
     with_metadata: bool = False,
     language: str = "auto",
 ):
+    """
+    Transcribe an audio file using Groq Whisper Large V3.
+
+    Parameters:
+        audio_path: Path to the audio file.
+        with_metadata: Return transcript + language information.
+        language: Language code such as en, hi, fr, es, ar,
+                  or auto for automatic detection.
+    """
+
     empty_result = {
         "text": "",
         "language": language,
         "language_probability": 0.0,
     }
 
+    # -----------------------------------------------------
+    # Check audio file
+    # -----------------------------------------------------
+
     if not os.path.exists(audio_path):
-        print("❌ Audio file not found:", audio_path)
-        return empty_result if with_metadata else ""
+        print("Audio file not found:", audio_path)
+
+        return (
+            empty_result
+            if with_metadata
+            else ""
+        )
 
     if os.path.getsize(audio_path) == 0:
-        print("❌ Audio file is empty")
-        return empty_result if with_metadata else ""
+        print("Audio file is empty")
+
+        return (
+            empty_result
+            if with_metadata
+            else ""
+        )
+
+    # -----------------------------------------------------
+    # Check API client
+    # -----------------------------------------------------
+
+    if client is None:
+        print("GROQ_API_KEY is not configured")
+
+        return (
+            empty_result
+            if with_metadata
+            else ""
+        )
 
     start_time = time.time()
 
     try:
-        # Manual language selection.
-        whisper_language = (
-            None if language == "auto" else language
-        )
 
-        print(
-            "🎤 Whisper input language:",
-            language,
-        )
+        print("=" * 60)
+        print("Sending audio to Groq Whisper...")
+        print("Model:", MODEL_NAME)
+        print("Input language:", language)
+        print("=" * 60)
 
-        segments, info = model.transcribe(
-            audio_path,
+        # -------------------------------------------------
+        # Open audio file
+        # -------------------------------------------------
 
-            language=whisper_language,
+        with open(audio_path, "rb") as audio_file:
 
-            task="transcribe",
+            request = {
+                "file": audio_file,
+                "model": MODEL_NAME,
+                "response_format": "verbose_json",
+                "temperature": 0.0,
+            }
 
-            # Keep the decoder neutral.
-            # Do NOT use initial_prompt here.
-            beam_size=5,
-            best_of=5,
-            temperature=0.0,
+            # -------------------------------------------------
+            # If language is known, provide it to Whisper.
+            #
+            # If language == "auto", Whisper detects it.
+            # -------------------------------------------------
 
-            # Silero VAD is already used by the
-            # streaming pipeline.
-            vad_filter=False,
+            if language != "auto":
+                request["language"] = language
 
-            # Reduce hallucinations.
-            no_speech_threshold=0.6,
-            compression_ratio_threshold=2.4,
+            transcription = (
+                client.audio.transcriptions.create(
+                    **request
+                )
+            )
 
-            # Important for independent live chunks.
-            condition_on_previous_text=False,
+        # -------------------------------------------------
+        # Extract transcript
+        # -------------------------------------------------
 
-            without_timestamps=True,
-
-            suppress_blank=True,
-
-            max_new_tokens=128,
-        )
-
-        transcript_parts = []
-
-        for segment in segments:
-            text = segment.text.strip()
-
-            if text:
-                transcript_parts.append(text)
-
-        transcript = " ".join(
-            transcript_parts
+        transcript = (
+            getattr(
+                transcription,
+                "text",
+                ""
+            )
+            or ""
         ).strip()
 
+        # -------------------------------------------------
+        # Extract detected language
+        # -------------------------------------------------
+
         detected_language = (
-            getattr(info, "language", None)
+            getattr(
+                transcription,
+                "language",
+                None
+            )
             or language
             or "auto"
         )
 
-        detected_probability = float(
-            getattr(
-                info,
-                "language_probability",
-                0.0,
-            )
-            or 0.0
+        # -------------------------------------------------
+        # Logging
+        # -------------------------------------------------
+
+        processing_time = (
+            time.time() - start_time
         )
 
-        print(
-            "📝 TRANSCRIPT:",
-            transcript or "No speech",
-        )
+        print("TRANSCRIPT:")
+        print(transcript or "No speech")
 
         print(
-            "🌐 Language:",
+            "Detected language:",
             detected_language,
         )
 
         print(
-            "📊 Whisper language probability:",
-            round(detected_probability, 3),
+            "Processing time:",
+            f"{processing_time:.2f}s",
         )
 
-        print(
-            "⏱️ Processing time:",
-            f"{time.time() - start_time:.2f}s",
-        )
+        # -------------------------------------------------
+        # Result
+        # -------------------------------------------------
 
         result = {
             "text": transcript,
             "language": detected_language,
-            "language_probability": detected_probability,
+            "language_probability": 1.0,
         }
 
-        return result if with_metadata else transcript
+        return (
+            result
+            if with_metadata
+            else transcript
+        )
+
+    # -----------------------------------------------------
+    # Error handling
+    # -----------------------------------------------------
 
     except Exception as error:
 
         print(
-            "❌ TRANSCRIPTION ERROR:",
+            "TRANSCRIPTION ERROR:",
             error,
         )
 
