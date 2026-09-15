@@ -6,7 +6,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, Header, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from silero_vad import load_silero_vad
 
@@ -18,13 +18,11 @@ from app.services.websocket_handlers import build_websocket_endpoint
 app = FastAPI(title="DiplomAI Real-Time Interpreter")
 
 default_origins = [
+    "https://sugam-samvad.vercel.app",
+    "https://www.sugam-samvad.vercel.app",
+    "https://sugam-samvad-1.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://sugam-samvad.vercel.app",
 ]
 
 env_origins = os.getenv("ALLOWED_ORIGINS", "")
@@ -119,6 +117,25 @@ async def get_sessions(user_id: int | None = None):
 
     return {
         "sessions": sessions,
+    }
+
+
+@app.get("/api/admin/status")
+async def admin_status(authorization: str | None = Header(default=None)):
+    admin_secret = os.getenv("ADMIN_SECRET")
+    if not admin_secret:
+        raise HTTPException(status_code=503, detail="Admin access is not configured.")
+
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+
+    if token != admin_secret:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    return {
+        "status": "authorized",
+        "role": "admin",
     }
 
 

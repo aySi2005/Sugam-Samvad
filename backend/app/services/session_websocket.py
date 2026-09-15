@@ -286,6 +286,24 @@ async def handle_session_websocket(
                     "type": "keep_alive_response",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
+
+            elif message_type == "language_change":
+                updated_participant = storage.update_participant_language(
+                    participant_id,
+                    message.get("language", ""),
+                )
+                if updated_participant is None:
+                    continue
+
+                participant_info["language"] = updated_participant["participantLanguage"]
+                await connection_manager.broadcast_to_session(
+                    session_id,
+                    {
+                        "type": "participant_updated",
+                        "participant": updated_participant,
+                        "activeParticipants": connection_manager.get_session_participants(session_id),
+                    },
+                )
             
             elif message_type == "status":
                 # Broadcast participant status to others

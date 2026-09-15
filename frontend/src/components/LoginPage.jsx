@@ -3,9 +3,9 @@ import { API_BASE } from "../config";
 
 function LoginPage({ onLoginSuccess, onJoinSessionGuest }) {
   const [mode, setMode] = useState("login");
-  const [name, setName] = useState("Master Admin");
-  const [email, setEmail] = useState("admin@web.in");
-  const [password, setPassword] = useState("admin123");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

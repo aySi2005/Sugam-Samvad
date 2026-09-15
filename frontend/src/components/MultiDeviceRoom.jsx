@@ -63,13 +63,32 @@ export default function MultiDeviceRoom({ session, participant, onLeave }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [speakingId, setSpeakingId] = useState(null);
+  const [selectedOutputLanguage, setSelectedOutputLanguage] = useState(
+    (participant?.participantLanguage || "en").toLowerCase()
+  );
 
   const socketRef = useRef(null);
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const myLanguageCode = (participant?.participantLanguage || "en").toLowerCase();
+  const myLanguageCode = (
+    selectedOutputLanguage || participant?.participantLanguage || "en"
+  ).toLowerCase();
   const myMeta = LANGUAGE_META[myLanguageCode] || LANGUAGE_META.en;
+
+  const handleLanguageSwitch = (nextLang) => {
+    const normalized = (nextLang || "en").toLowerCase();
+    setSelectedOutputLanguage(normalized);
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({
+          type: "language_change",
+          language: normalized,
+          participantId: participant?.id,
+        })
+      );
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -130,7 +149,7 @@ export default function MultiDeviceRoom({ session, participant, onLeave }) {
               const formattedHistory = data.history.map((item) => {
                 const targetText =
                   item.translations?.[myLanguageCode] ||
-                  item.translations?.[myMeta.name] ||
+                  item.translations?.[LANGUAGE_META[myLanguageCode]?.name] ||
                   item.transcript;
                 return {
                   id: item.id || Math.random().toString(),
@@ -150,6 +169,10 @@ export default function MultiDeviceRoom({ session, participant, onLeave }) {
               setParticipants(data.activeParticipants);
             }
           } else if (data.type === "participant_left") {
+            if (data.activeParticipants) {
+              setParticipants(data.activeParticipants);
+            }
+          } else if (data.type === "participant_updated") {
             if (data.activeParticipants) {
               setParticipants(data.activeParticipants);
             }
@@ -742,7 +765,7 @@ export default function MultiDeviceRoom({ session, participant, onLeave }) {
                 const pMeta = LANGUAGE_META[pLang] || LANGUAGE_META.en;
                 const isMe = p.id === participant.id;
                 return (
-                  <li key={p.id || Math.random()} className={`participant-item ${isMe ? "is-me" : ""}`}>
+                  <li key={p.id || `${p.name}-${pLang}`} className={`participant-item ${isMe ? "is-me" : ""}`}>
                     <span className="participant-flag">{pMeta.flag}</span>
                     <div className="participant-info">
                       <div className="participant-name">
@@ -775,6 +798,19 @@ export default function MultiDeviceRoom({ session, participant, onLeave }) {
               />
               <span>🔊 Auto-Speak Incoming</span>
             </label>
+
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", marginBottom: 8 }}>Listening / Output Language</div>
+              <select
+                value={selectedOutputLanguage}
+                onChange={(e) => handleLanguageSwitch(e.target.value)}
+                style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #cbd5e0" }}
+              >
+                {Object.entries(LANGUAGE_META).map(([code, meta]) => (
+                  <option key={code} value={code}>{meta.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 

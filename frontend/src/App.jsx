@@ -74,6 +74,12 @@ function App() {
     "Hindi",
     "French",
     "Arabic",
+    "Spanish",
+    "Russian",
+    "Italian",
+    "Japanese",
+    "German",
+    "Hebrew",
   ]);
 
   const socketRef = useRef(null);
@@ -234,15 +240,26 @@ const stopSpeaking = () => {
     "French",
     "Arabic",
     "Spanish",
+    "Russian",
+    "Italian",
+    "Japanese",
+    "German",
+    "Hebrew",
   ];
 
   // Source language names
   const inputLanguageNames = {
+    auto: "Auto Detect",
     en: "English",
     hi: "Hindi",
     fr: "French",
     ar: "Arabic",
     es: "Spanish",
+    ru: "Russian",
+    it: "Italian",
+    ja: "Japanese",
+    de: "German",
+    he: "Hebrew",
   };
   const portalText = {
     en: {
@@ -565,9 +582,13 @@ const stopSpeaking = () => {
       if (socketRef.current) {
         try {
           socketRef.current.close();
-        } catch {}
+        } catch (error) {
+          void error;
+        }
       }
     };
+  // The socket is intentionally created once; mutable refs provide current runtime state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -824,7 +845,9 @@ const stopSpeaking = () => {
           null;
 
         workletRef.current.disconnect();
-      } catch {}
+      } catch (error) {
+        void error;
+      }
 
       workletRef.current = null;
     }
@@ -832,7 +855,9 @@ const stopSpeaking = () => {
     if (sourceRef.current) {
       try {
         sourceRef.current.disconnect();
-      } catch {}
+      } catch (error) {
+        void error;
+      }
 
       sourceRef.current = null;
     }
@@ -840,7 +865,9 @@ const stopSpeaking = () => {
     if (audioContextRef.current) {
       try {
         await audioContextRef.current.close();
-      } catch {}
+      } catch (error) {
+        void error;
+      }
 
       audioContextRef.current = null;
     }
@@ -1128,6 +1155,11 @@ const stopSpeaking = () => {
     French: "🇫🇷",
     Arabic: "🇸🇦",
     Spanish: "🇪🇸",
+    Russian: "🇷🇺",
+    Italian: "🇮🇹",
+    Japanese: "🇯🇵",
+    German: "🇩🇪",
+    Hebrew: "🇮🇱",
   };
 
   const languageCodes = {
@@ -1136,6 +1168,11 @@ const stopSpeaking = () => {
     French: "fr",
     Arabic: "ar",
     Spanish: "es",
+    Russian: "ru",
+    Italian: "it",
+    Japanese: "ja",
+    German: "de",
+    Hebrew: "he",
   };
 
   return (

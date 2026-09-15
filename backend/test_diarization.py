@@ -1,9 +1,15 @@
-from pyannote.audio import Pipeline
+import os
 
-print("Loading speaker diarization model...")
+import pytest
 
-pipeline = Pipeline.from_pretrained(
-    "pyannote/speaker-diarization-3.1"
+
+@pytest.mark.skipif(
+    os.getenv("RUN_DIARIZATION_TESTS") != "1",
+    reason="Diarization requires an explicit opt-in and Hugging Face credentials",
 )
+def test_diarization_pipeline_loads():
+    pytest.importorskip("pyannote.audio")
+    from pyannote.audio import Pipeline
 
-print("Model loaded successfully.")
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
+    assert pipeline is not None

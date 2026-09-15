@@ -2,6 +2,7 @@ function TranscriptPanel({
   finalizedSegments,
   liveTranscript,
   sourceLanguage,
+  sessionInfo,
 }) {
   const hasTranscript =
     finalizedSegments.length > 0 ||
@@ -21,6 +22,42 @@ function TranscriptPanel({
           sourceLanguage.confidence * 100
         )}%`
       : "";
+
+  const exportPdf = () => {
+    const rows = finalizedSegments.length > 0 ? finalizedSegments : [liveTranscript || "Waiting for transcript..."];
+    const printable = rows.join("\n\n");
+    const printWindow = window.open("", "_blank", "width=900,height=1000");
+    if (!printWindow) return;
+
+    const docTitle = sessionInfo?.title || "DiplomAI Transcript";
+    const docDate = new Date().toLocaleString();
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${docTitle}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 32px; color: #1a202c; }
+            .header { border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; }
+            h1 { margin: 0; font-size: 28px; }
+            .meta { color: #475569; margin-top: 8px; }
+            .content { white-space: pre-wrap; line-height: 1.7; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${docTitle}</h1>
+            <div class="meta">Generated: ${docDate}</div>
+            <div class="meta">Source language: ${name} ${confidence ? `(${confidence})` : ""}</div>
+          </div>
+          <div class="content">${printable.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-[#0b1220]">
@@ -50,6 +87,14 @@ function TranscriptPanel({
             {name} {confidence && `• ${confidence}`}
           </span>
         </div>
+
+        <button
+          type="button"
+          onClick={exportPdf}
+          className="rounded-lg border border-blue-500/50 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-200 transition hover:bg-blue-500/20"
+        >
+          Save PDF
+        </button>
       </div>
 
       <div className="max-h-[360px] min-h-[180px] overflow-y-auto px-8 py-7">

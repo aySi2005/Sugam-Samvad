@@ -2,6 +2,7 @@ import { useState } from "react";
 import { API_BASE } from "../config";
 
 const LANGUAGES = [
+  { code: "auto", name: "Auto Detect / Not Required" },
   { code: "en", name: "English" },
   { code: "hi", name: "Hindi" },
   { code: "fr", name: "French" },
@@ -17,7 +18,7 @@ const LANGUAGES = [
 export default function SessionJoin({ onSessionJoined, onCancel, loggedUser }) {
   const [sessionCode, setSessionCode] = useState("");
   const [participantName, setParticipantName] = useState(loggedUser?.name || "");
-  const [participantLanguage, setParticipantLanguage] = useState("en");
+  const [participantLanguage, setParticipantLanguage] = useState("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 

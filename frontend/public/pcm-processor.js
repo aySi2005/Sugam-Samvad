@@ -1,3 +1,5 @@
+/* global AudioWorkletProcessor, registerProcessor, sampleRate */
+
 class PCMProcessor extends AudioWorkletProcessor {
   constructor() {
     super();

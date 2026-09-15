@@ -47,6 +47,11 @@ ALLOWED_SOURCE_LANGUAGES = {
     "fr",
     "ar",
     "es",
+    "ru",
+    "it",
+    "ja",
+    "de",
+    "he",
 }
 
 LANGUAGE_NAMES = {
@@ -55,6 +60,12 @@ LANGUAGE_NAMES = {
     "fr": "French",
     "ar": "Arabic",
     "es": "Spanish",
+    "ru": "Russian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "de": "German",
+    "he": "Hebrew",
+    "auto": "Auto Detect",
 }
 
 

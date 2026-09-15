@@ -44,6 +44,7 @@ def initialize() -> None:
                 name TEXT,
                 email TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
                 created_at TEXT NOT NULL,
                 last_login_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -104,6 +105,8 @@ def initialize() -> None:
 
         if "name" not in columns:
             connection.execute("ALTER TABLE users ADD COLUMN name TEXT")
+        if "role" not in columns:
+            connection.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
 
         session_columns = [row["name"] for row in connection.execute("PRAGMA table_info(sessions)")]
 
@@ -122,20 +125,20 @@ def _ensure_default_admin() -> None:
 
     with _connect() as connection:
         existing_user = connection.execute(
-            "SELECT id, name, password FROM users WHERE email = ?",
+            "SELECT id, name, password, role FROM users WHERE email = ?",
             (admin_email,),
         ).fetchone()
 
         if existing_user is None:
             connection.execute(
-                "INSERT INTO users (name, email, password, created_at, last_login_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (admin_name, admin_email, admin_hash, now, now, now),
+                "INSERT INTO users (name, email, password, role, created_at, last_login_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (admin_name, admin_email, admin_hash, "admin", now, now, now),
             )
             return
 
         connection.execute(
-            "UPDATE users SET name = ?, password = ?, updated_at = ?, last_login_at = ? WHERE id = ?",
-            (admin_name, admin_hash, now, now, existing_user["id"]),
+            "UPDATE users SET name = ?, password = ?, role = ?, updated_at = ?, last_login_at = ? WHERE id = ?",
+            (admin_name, admin_hash, "admin", now, now, existing_user["id"]),
         )
 
 
@@ -229,7 +232,7 @@ def get_user_by_email(email: str) -> dict | None:
 
     with _connect() as connection:
         row = connection.execute(
-            "SELECT id, name, email, password, created_at, last_login_at, updated_at FROM users WHERE email = ?",
+            "SELECT id, name, email, password, role, created_at, last_login_at, updated_at FROM users WHERE email = ?",
             (normalized_email,),
         ).fetchone()
 
@@ -241,6 +244,7 @@ def get_user_by_email(email: str) -> dict | None:
         "name": row["name"],
         "email": row["email"],
         "password": row["password"],
+        "role": row["role"] or "user",
         "created_at": row["created_at"],
         "last_login_at": row["last_login_at"],
         "updated_at": row["updated_at"],
@@ -274,6 +278,7 @@ def authenticate_or_create_user(email: str, password: str) -> dict | None:
             "id": user["id"],
             "name": user.get("name"),
             "email": user["email"],
+            "role": user.get("role", "user"),
             "created_at": user["created_at"],
             "last_login_at": user["last_login_at"],
         }
@@ -291,6 +296,7 @@ def authenticate_or_create_user(email: str, password: str) -> dict | None:
         "id": existing_user["id"],
         "name": existing_user.get("name"),
         "email": existing_user["email"],
+        "role": existing_user.get("role", "user"),
         "created_at": existing_user["created_at"],
         "last_login_at": now,
     }
@@ -327,6 +333,7 @@ def create_user(name: str, email: str, password: str) -> dict | None:
         "id": created_user["id"],
         "name": created_user.get("name"),
         "email": created_user["email"],
+        "role": created_user.get("role", "user"),
         "created_at": created_user["created_at"],
         "last_login_at": created_user["last_login_at"],
     }
@@ -499,6 +506,41 @@ def update_participant_socket_id(participant_id: int, socket_id: str) -> None:
             "UPDATE participants SET socket_id = ? WHERE id = ?",
             (socket_id, participant_id),
         )
+
+
+def update_participant_language(participant_id: int, language_code: str) -> dict | None:
+    """Update a participant's preferred output language for the session."""
+    normalized = (language_code or "").strip().lower()
+    if not normalized:
+        return None
+
+    with _connect() as connection:
+        participant = connection.execute(
+            "SELECT * FROM participants WHERE id = ?",
+            (participant_id,),
+        ).fetchone()
+        if participant is None:
+            return None
+
+        connection.execute(
+            "UPDATE participants SET participant_language = ? WHERE id = ?",
+            (normalized, participant_id),
+        )
+
+        refreshed = connection.execute(
+            "SELECT * FROM participants WHERE id = ?",
+            (participant_id,),
+        ).fetchone()
+
+    return {
+        "id": refreshed["id"],
+        "interpretationSessionId": refreshed["interpretation_session_id"],
+        "participantName": refreshed["participant_name"],
+        "participantLanguage": refreshed["participant_language"],
+        "userId": refreshed["user_id"],
+        "joinedAt": refreshed["joined_at"],
+        "socketId": refreshed["socket_id"],
+    }
 
 
 def deactivate_interpretation_session(interpretation_session_id: int) -> None:
